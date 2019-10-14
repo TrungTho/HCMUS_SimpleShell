@@ -10,9 +10,9 @@
 
 #define MAX_LINE 80
 
-static char* historyCache;
+char* historyCache;
 
-static void execLine(const char* line)
+void execLine(const char* line)
 {
 
 	int argc = 0;
@@ -45,7 +45,6 @@ static void execLine(const char* line)
 
 	while (argc > 2)
 	{
-
 		if (strcmp(args[argc - 2], ">") == 0)
 		{
 			creat(args[argc - 1], S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -110,13 +109,13 @@ static void execLine(const char* line)
 	free(inputLine);
 }
 
-static void saveCmd(const char* cmd)
+void saveCmd(const char* cmd)
 {
 	free(historyCache);
 	historyCache = strdup(cmd);
 }
 
-static void history(const char* cmd)
+void history(const char* cmd)
 {
 	if (historyCache == NULL)
 	{
@@ -126,6 +125,11 @@ static void history(const char* cmd)
 	printf("osh>%s\n", historyCache);
 	execLine(historyCache);
 
+}
+
+void execPipe(const char* line)
+{
+	
 }
 
 int main(int argc, char* argv[])
