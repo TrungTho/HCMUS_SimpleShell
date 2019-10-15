@@ -140,10 +140,11 @@ void execPipe(const char* line)
 	
 	token[size]=NULL;
 	
-	char *firstCmd;
-	char *secondCmd;
+	char *firstCmd; //the first part 
+	char *secondCmd; //the second part
 	int sizeCmd1 = 0, sizeCmd2 =0 , posOfSplit=0;
 	int type =1;
+	
 	//find char "|"
 	int pos=0;
 	while (pos < size)
@@ -155,9 +156,9 @@ void execPipe(const char* line)
 		}
 		else
 			if (type==1)
-				firstCmd[sizeCmd1++]=token[pos];
+				firstCmd[sizeCmd1++]=token[pos]; //add token to new arr
 			else
-				secondCmd[sizeCmd2++]=token[pos];
+				secondCmd[sizeCmd2++]=token[pos]; //add token to new arr
 		
 		pos++;
 	}
@@ -181,17 +182,17 @@ void execPipe(const char* line)
 	}
 	//check if process is parent or child
 	
-	if (p1==0) //child
+	if (p1==0) //check if process is child
 	{
 		close(fd[0]); 
 		dup2(fd[1], STDOUT_FILENO);
 		close(fd[1]);
 		
-		if (execvp(token[0],firstCmd)<0)
+		if (execvp(token[0],firstCmd)<0) //syscall to process cmd in first part
 		{
-			printf("err when exec first part\n");
-			exit(0);//exit child 1 to return parent
+			printf("\nerr when exec first part\n");
 		}
+		exit(0);//exit child 1 to return parent
 	}
 	else
 	{
@@ -203,17 +204,17 @@ void execPipe(const char* line)
             return;
 		}
 		
-		if (p2 == 0) //child 2 running
+		if (p2 == 0) //check if process is child 
 		{
 			close(fd[1]);
 			dup2(fd[0],STDIN_FILENO);
 			close(fd[0]);
 			
-			if (execvp(token[posOfSplit+1],secondCmd) < 0)
+			if (execvp(token[posOfSplit+1],secondCmd) < 0) //syscall to process cmd in the second part
 			{
 				printf("err when exec second part\n");
-				exit(0); //exit child 2 to return parent
 			}
+			exit(0); //exit child 2 to return parent
 		}
 		else //parent running
 		{
@@ -224,16 +225,16 @@ void execPipe(const char* line)
 	
 }
 
-bool checkPipeCmd(const char* line)
+int checkPipeCmd(const char* line)
 {
 	int len=strlen(line);
 	int i=0;
 	while (i<len)
 	{
 		if (line[i]=='|')
-			return true;
+			return 1;
 	}
-	return false;
+	return 0;
 }
 
 int main(int argc, char* argv[])
@@ -241,8 +242,9 @@ int main(int argc, char* argv[])
 
 	size_t line_size = 100;
 	char* line = (char*)malloc(sizeof(char) * line_size);
-	int shouldrun = 1;
-	while (shouldrun)
+	int continueRun = 1;
+	
+	while (continueRun)
 	{
 		printf("osh>");
 		fflush(stdout);
@@ -250,32 +252,30 @@ int main(int argc, char* argv[])
 		getline(&line, &line_size, stdin);
 
 		int line_len = strlen(line);
-		if (line_len == 1)
+		if (line_len != 1)
 		{
-			continue;
-		}
-		line[line_len - 1] = '\0';
-
-		if (strcmp(line, "exit") == 0)
-		{
-			shouldrun = 0;
-			continue;
-		}
-		else 
-			if (strcmp(line, "!!") == 0)
+			line[line_len - 1] = '\0';
+			
+			if (strcmp(line, "exit") == 0) //user input exit
 			{
-				history(line);
+				continueRun = 0;
 			}
 			else 
-				if (checkPipeCmd(line))
+				if (strcmp(line, "!!") == 0) //user want to know the latest command line
 				{
-					execPipe(line);
+					history(line);
 				}
-				else
-				{
-					saveCmd(line);
-					execLine(line);
-				}
+				else 
+					if (checkPipeCmd(line)) //user want to use pipe to command
+					{
+						execPipe(line);
+					}
+					else //normal command
+					{
+						saveCmd(line);
+						execLine(line);
+					}
+		}
 	}
 
 	free(line);
