@@ -129,7 +129,111 @@ void history(const char* cmd)
 
 void execPipe(const char* line)
 {
+	char* inputLine = strdup(line);
+	char* token[MAX_LINE / 2 + 1];
+	token[0] = strtok(inputLine, " "); //take the first word of command line
+	int size=1;
+	while (token[size-1]!=NULL) //if the latest word is not null => continue to take
+	{
+		token[size++]=strtok(inputLine, " ");
+	}
 	
+	token[size]=NULL;
+	
+	char *firstCmd;
+	char *secondCmd;
+	int sizeCmd1 = 0, sizeCmd2 =0 , posOfSplit=0;
+	int type =1;
+	//find char "|"
+	int pos=0;
+	while (pos < size)
+	{
+		if (token[pos]=="|")
+		{
+			type = 2;
+			posOfSplit=pos;
+		}
+		else
+			if (type==1)
+				firstCmd[sizeCmd1++]=token[pos];
+			else
+				secondCmd[sizeCmd2++]=token[pos];
+		
+		pos++;
+	}
+	
+	firstCmd[sizeCmd1]=NULL;
+	secondCmd[sizeCmd2]=NULL;
+	
+	int fd[2];
+	
+	if (pipe(fd) != 0) //init pipe
+	{
+		printf("\nPipe could not be initialized\n");
+		return;
+	}
+	
+	pid_t p1 =folk();  //create a new process
+	if (p1 < 0)
+	{
+		printf("\nCould not fork"); 
+        return;
+	}
+	//check if process is parent or child
+	
+	if (p1==0) //child
+	{
+		close(fd[0]); 
+		dup2(fd[1], STDOUT_FILENO);
+		close(fd[1]);
+		
+		if (execvp(token[0],firstCmd)<0)
+		{
+			printf("err when exec first part\n");
+			exit(0);//exit child 1 to return parent
+		}
+	}
+	else
+	{
+		pid_t p2 = folk();
+		
+		if (p2 < 0)
+		{
+			printf("\nCould not fork\n"); 
+            return;
+		}
+		
+		if (p2 == 0) //child 2 running
+		{
+			close(fd[1]);
+			dup2(fd[0],STDIN_FILENO);
+			close(fd[0]);
+			
+			if (execvp(token[posOfSplit+1],secondCmd) < 0)
+			{
+				printf("err when exec second part\n");
+				exit(0); //exit child 2 to return parent
+			}
+		}
+		else //parent running
+		{
+			wait(NULL);
+			wait(NULL);
+		}
+	}
+	
+}
+
+bool checkPipeCmd(const char* line)
+{
+	int len=strlen(line);
+	int i=0;
+	while (i<len)
+	{
+		if (line[i]=='|')
+			return true;
+	}
+	return false;
 }
 
 int main(int argc, char* argv[])
@@ -157,15 +261,21 @@ int main(int argc, char* argv[])
 			shouldrun = 0;
 			continue;
 		}
-		else if (strcmp(line, "!!") == 0)
-		{
-			history(line);
-		}
-		else
-		{
-			saveCmd(line);
-			execLine(line);
-		}
+		else 
+			if (strcmp(line, "!!") == 0)
+			{
+				history(line);
+			}
+			else 
+				if (checkPipeCmd(line))
+				{
+					execPipe(line);
+				}
+				else
+				{
+					saveCmd(line);
+					execLine(line);
+				}
 	}
 
 	free(line);
