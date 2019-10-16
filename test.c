@@ -132,42 +132,42 @@ void execPipe(const char* line)
 	char* inputLine = strdup(line);
 	char* token[MAX_LINE / 2 + 1];
 	token[0] = strtok(inputLine, " "); //take the first word of command line
-	int size=1;
-	while (token[size-1]!=NULL) //if the latest word is not null => continue to take
+	int size = 1;
+	while (token[size - 1] != NULL) //if the latest word is not null => continue to take
 	{
-		token[size++]=strtok(inputLine, " ");
+		token[size++] = strtok(inputLine, " ");
 	}
-	
-	token[size]=NULL;
-	
-	char *firstCmd; //the first part 
-	char *secondCmd; //the second part
-	int sizeCmd1 = 0, sizeCmd2 =0 , posOfSplit=0;
-	int type =1;
-	
+
+	size--;
+
+	char* firstCmd[MAX_LINE / 2 + 1]; //the first part 
+	char* secondCmd[MAX_LINE / 2 + 1]; //the second part
+	int sizeCmd1 = 0, sizeCmd2 = 0, posOfSplit = 0;
+	int type = 1;
+
 	//find char "|"
-	int pos=0;
+	int pos = 0;
 	while (pos < size)
 	{
-		if (token[pos]=="|")
+		if (token[pos] == "|")
 		{
 			type = 2;
-			posOfSplit=pos;
+			posOfSplit = pos;
 		}
 		else
-			if (type==1)
-				firstCmd[sizeCmd1++]=token[pos]; //add token to new arr
+			if (type == 1)
+				firstCmd[sizeCmd1++] = token[pos]; //add token to new arr
 			else
-				secondCmd[sizeCmd2++]=token[pos]; //add token to new arr
-		
+				secondCmd[sizeCmd2++] = token[pos]; //add token to new arr
+
 		pos++;
 	}
-	
-	firstCmd[sizeCmd1]=NULL;
-	secondCmd[sizeCmd2]=NULL;
-	
+
+	firstCmd[sizeCmd1] = NULL;
+	secondCmd[sizeCmd2] = NULL;
+
 	int fd[2];
-	
+
 	if (pipe(fd) != 0) //init pipe
 	{
 		printf("\nPipe could not be initialized\n");
@@ -177,18 +177,18 @@ void execPipe(const char* line)
 	pid_t p1 =fork();  //create a new process
 	if (p1 < 0)
 	{
-		printf("\nCould not fork"); 
-        return;
+		printf("\nCould not fork");
+		return;
 	}
 	//check if process is parent or child
-	
-	if (p1==0) //check if process is child
+
+	if (p1 == 0) //check if process is child
 	{
-		close(fd[0]); 
+		close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
 		close(fd[1]);
-		
-		if (execvp(token[0],firstCmd)<0) //syscall to process cmd in first part
+
+		if (execvp(token[0], firstCmd) < 0) //syscall to process cmd in first part
 		{
 			printf("\nerr when exec first part\n");
 		}
@@ -200,17 +200,17 @@ void execPipe(const char* line)
 		
 		if (p2 < 0)
 		{
-			printf("\nCould not fork\n"); 
-            return;
+			printf("\nCould not fork\n");
+			return;
 		}
-		
+
 		if (p2 == 0) //check if process is child 
 		{
 			close(fd[1]);
-			dup2(fd[0],STDIN_FILENO);
+			dup2(fd[0], STDIN_FILENO);
 			close(fd[0]);
-			
-			if (execvp(token[posOfSplit+1],secondCmd) < 0) //syscall to process cmd in the second part
+
+			if (execvp(token[posOfSplit + 1], secondCmd) < 0) //syscall to process cmd in the second part
 			{
 				printf("err when exec second part\n");
 			}
@@ -222,17 +222,18 @@ void execPipe(const char* line)
 			wait(NULL);
 		}
 	}
-	
+
 }
 
 int checkPipeCmd(const char* line)
 {
-	int len=strlen(line);
-	int i=0;
-	while (i<len)
+	int len = strlen(line);
+	int i = 0;
+	while (i < len)
 	{
-		if (line[i]=='|')
+		if (line[i] == '|')
 			return 1;
+		i++;
 	}
 	return 0;
 }
@@ -243,7 +244,7 @@ int main(int argc, char* argv[])
 	size_t line_size = 100;
 	char* line = (char*)malloc(sizeof(char) * line_size);
 	int continueRun = 1;
-	
+
 	while (continueRun)
 	{
 		printf("osh>");
@@ -264,11 +265,18 @@ int main(int argc, char* argv[])
 			continue;
 		}
 			else 
+			line[line_len - 1] = '\0';
+
+			if (strcmp(line, "exit") == 0) //user input exit
+			{
+				continueRun = 0;
+			}
+			else
 				if (strcmp(line, "!!") == 0) //user want to know the latest command line
 				{
 					history(line);
 				}
-				else 
+				else
 					if (checkPipeCmd(line)) //user want to use pipe to command
 					{
 						execPipe(line);
