@@ -174,7 +174,7 @@ void execPipe(const char* line)
 		return;
 	}
 	
-	pid_t p1 =folk();  //create a new process
+	pid_t p1 =fork();  //create a new process
 	if (p1 < 0)
 	{
 		printf("\nCould not fork"); 
@@ -196,7 +196,7 @@ void execPipe(const char* line)
 	}
 	else
 	{
-		pid_t p2 = folk();
+		pid_t p2 = fork();
 		
 		if (p2 < 0)
 		{
@@ -252,14 +252,17 @@ int main(int argc, char* argv[])
 		getline(&line, &line_size, stdin);
 
 		int line_len = strlen(line);
-		if (line_len != 1)
+		if (line_len == 1)
 		{
-			line[line_len - 1] = '\0';
-			
-			if (strcmp(line, "exit") == 0) //user input exit
-			{
-				continueRun = 0;
-			}
+			continue;
+		}
+		line[line_len - 1] = '\0';
+
+		if (strcmp(line, "exit") == 0)
+		{
+			continueRun = 0;
+			continue;
+		}
 			else 
 				if (strcmp(line, "!!") == 0) //user want to know the latest command line
 				{
