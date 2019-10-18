@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -8,67 +7,65 @@
 #include <string.h>
 #include <sys/types.h>
 
-#define MAX_LINE 80
+#define MAX_LINE 80 //max number of characters on a line
 
-char* historyCache;
+char* historyCache;	//variable to save the latest command
 
 void execLine(const char* line)
 {
 
-	int argc = 0;
-	char* args[MAX_LINE / 2 + 1];
+	int tokensSize = 0;
+	char* tokens[MAX_LINE / 2 + 1];
 	int fd[2] = { -1, -1 };
 	int setWait = 0;
 	int status;
 
+	//split user command into tokens
 	char* inputLine = strdup(line);
-	args[argc++] = strtok(inputLine, " ");
+	tokens[tokensSize++] = strtok(inputLine, " ");
 
-	while (args[argc - 1] != NULL)
+	while (tokens[tokensSize - 1] != NULL)
 	{
-
-		args[argc] = strtok(NULL, " ");
-		argc++;
+		tokens[tokensSize++] = strtok(NULL, " ");
 	}
 
-	argc--;
+	tokensSize--;
 
-
-	if (strcmp(args[argc - 1], "&") == 0)
+	//check if user want to create a parallel process
+	if (strcmp(tokens[tokensSize - 1], "&") == 0)
 	{
 		setWait = 1;
-		argc--;
-		args[argc] = NULL;
+		tokensSize--;
+		tokens[tokensSize] = NULL;
 	}
 
-
-
-	while (argc > 2)
+	while (tokensSize > 2)
 	{
-		if (strcmp(args[argc - 2], ">") == 0)
+		if (strcmp(tokens[tokensSize - 2], ">") == 0) //check if user want to redirect output
 		{
-			creat(args[argc - 1], S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+			creat(tokens[tokensSize - 1], S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH); //create a new file to write in
 
-			fd[1] = open(args[argc - 1], O_WRONLY | O_TRUNC);
-			if (fd[1] == -1)
+			fd[1] = open(tokens[tokensSize - 1], O_WRONLY | O_TRUNC);	//open file to write
+			if (fd[1] == -1) //open failed
 			{
 				free(inputLine);
 				return;
 			}
 
-			args[argc - 2] = NULL;
-			argc -= 2;
+			tokens[tokensSize - 2] = NULL;
+			tokensSize -= 2;
 		}
-		else if (strcmp(args[argc - 2], "<") == 0)
+		else if (strcmp(tokens[tokensSize - 2], "<") == 0) //check if user want to redirect input
 		{
-			fd[0] = open(args[argc - 1], O_RDONLY);
-			if (fd[0] == -1)
+			fd[0] = open(tokens[tokensSize - 1], O_RDONLY); //open data source user want to input
+			if (fd[0] == -1) //open failed
 			{
 				free(inputLine);
 				return;
 			}
-			args[argc - 2] = NULL;
-			argc -= 2;
+			
+			tokens[tokensSize - 2] = NULL; //delete redirect characters and source of it
+			tokensSize -= 2;
 		}
 		else
 		{
@@ -77,42 +74,45 @@ void execLine(const char* line)
 	}
 
 
-	pid_t pid = fork();
-	switch (pid)
+	pid_t pid = fork(); //create a new process
+	
+	switch (pid) //check pid
 	{
-	case -1:
-		break;
-	case 0:
-		if (fd[0] != -1)
-		{
-			if (dup2(fd[0], STDIN_FILENO) != STDIN_FILENO)
+		case -1: //fork failed
+			break;
+		case 0:
+			if (fd[0] != -1) 
 			{
-				exit(1);
+				if (dup2(fd[0], STDIN_FILENO) != STDIN_FILENO)  //check read - end is ready
+				{
+					exit(1);
+				}
 			}
-		}
-		if (fd[1] != -1)
-		{
-			if (dup2(fd[1], STDOUT_FILENO) != STDOUT_FILENO)
+			if (fd[1] != -1)
 			{
-				exit(1);
+				if (dup2(fd[1], STDOUT_FILENO) != STDOUT_FILENO) //check write - end is ready
+				{
+					exit(1);
+				}
 			}
-		}
-		execvp(args[0], args);
-		exit(0);
-	default:
-		close(fd[0]);
-		close(fd[1]);
-		if (!setWait)
-			waitpid(pid, &status, 0);
-		break;
+			execvp(tokens[0], tokens); //syscall to process user's command
+			exit(0);
+		default:
+			close(fd[0]);	//close read - end
+			close(fd[1]);	//close write - end
+			
+			if (!setWait)
+				waitpid(pid, &status, 0); //if there isn't any parallel process => wait for the pid_process to finish before a new command
+			break;
 	}
-	free(inputLine);
+	
+	free(inputLine); //free memory
 }
 
 void saveCmd(const char* cmd)
 {
-	free(historyCache);
-	historyCache = strdup(cmd);
+	free(historyCache); //free memory to reset data
+	historyCache = strdup(cmd);	//new data to save
 }
 
 void history(const char* cmd)
@@ -122,20 +122,23 @@ void history(const char* cmd)
 		printf("No commands in history\n");
 		return;
 	}
-	printf("osh>%s\n", historyCache);
-	execLine(historyCache);
+	
+	printf("osh>%s\n", historyCache); //printf lastest user's command
+	execLine(historyCache);	//exec the command
 
 }
 
 void execPipe(const char* line)
 {
 	char* inputLine = strdup(line);
-	char* token[MAX_LINE / 2 + 1];
-	token[0] = strtok(inputLine, " "); //take the first word of command line
+	char* tokens[MAX_LINE / 2 + 1];
+	
+	//parse the inputLine to tokens
+	tokens[0] = strtok(inputLine, " "); //take the first word of command line
 	int size = 1;
-	while (token[size - 1] != NULL) //if the latest word is not null => continue to take
+	while (tokens[size - 1] != NULL) //if the latest word is not null => continue to take
 	{
-		token[size++] = strtok(inputLine, " ");
+		tokens[size++] = strtok(NULL, " ");
 	}
 
 	size--;
@@ -149,23 +152,24 @@ void execPipe(const char* line)
 	int pos = 0;
 	while (pos < size)
 	{
-		if (token[pos] == "|")
+		if (strcmp(tokens[pos],"|")==0)
 		{
 			type = 2;
 			posOfSplit = pos;
 		}
 		else
 			if (type == 1)
-				firstCmd[sizeCmd1++] = token[pos]; //add token to new arr
+				firstCmd[sizeCmd1++] = tokens[pos]; //add tokens to new arr
 			else
-				secondCmd[sizeCmd2++] = token[pos]; //add token to new arr
+				secondCmd[sizeCmd2++] = tokens[pos]; //add tokens to new arr
 
 		pos++;
 	}
 
-	firstCmd[sizeCmd1] = NULL;
-	secondCmd[sizeCmd2] = NULL;
-
+	firstCmd[sizeCmd1] = NULL; //add NULL to arr to use in syscall execvp()
+	secondCmd[sizeCmd2] = NULL;	//add NULL to arr to use in syscall execvp()
+	
+	
 	int fd[2];
 
 	if (pipe(fd) != 0) //init pipe
@@ -173,31 +177,33 @@ void execPipe(const char* line)
 		printf("\nPipe could not be initialized\n");
 		return;
 	}
-	
-	pid_t p1 =fork();  //create a new process
+
+	pid_t p1 = fork();  //create a new process - process 1
 	if (p1 < 0)
 	{
-		printf("\nCould not fork");
+		printf("\nFailed fork\n");
 		return;
 	}
 	//check if process is parent or child
 
 	if (p1 == 0) //check if process is child
 	{
-		close(fd[0]);
-		dup2(fd[1], STDOUT_FILENO);
-		close(fd[1]);
-
-		if (execvp(token[0], firstCmd) < 0) //syscall to process cmd in first part
+		close(fd[0]); //close read - end because it will process and output data to process 2
+		dup2(fd[1], STDOUT_FILENO); //write data to fd[1]
+		close(fd[1]);				//out all data - finish writing => close write - end
+		
+		//begin exec by syscall
+		if (execvp(tokens[0], firstCmd) < 0) //syscall to process cmd in first part
 		{
-			printf("\nerr when exec first part\n");
+			printf("\nError when exec first part\n");
 		}
 		exit(0);//exit child 1 to return parent
 	}
 	else
 	{
+		//create a new process: child - process 2
 		pid_t p2 = fork();
-		
+
 		if (p2 < 0)
 		{
 			printf("\nCould not fork\n");
@@ -206,18 +212,20 @@ void execPipe(const char* line)
 
 		if (p2 == 0) //check if process is child 
 		{
-			close(fd[1]);
-			dup2(fd[0], STDIN_FILENO);
-			close(fd[0]);
+			close(fd[1]); //close write - end because it receive data from process - child 1 to process
+			dup2(fd[0], STDIN_FILENO);	//get data to fd[0]
+			close(fd[0]);	//get all data => close read - end
 
-			if (execvp(token[posOfSplit + 1], secondCmd) < 0) //syscall to process cmd in the second part
+			if (execvp(tokens[posOfSplit + 1], secondCmd) < 0) //syscall to process cmd in the second part
 			{
-				printf("err when exec second part\n");
+				printf("Error when exec second part\n");
 			}
 			exit(0); //exit child 2 to return parent
 		}
 		else //parent running
 		{
+			close(fd[1]); //close write - end of parent to sign that it isn't process any thing and ready to get data - result from its children
+			//waiting for 2 children
 			wait(NULL);
 			wait(NULL);
 		}
@@ -245,29 +253,20 @@ int main(int argc, char* argv[])
 	char* line = (char*)malloc(sizeof(char) * line_size);
 	int continueRun = 1;
 
+	//run still user type "exit" or close terminal
 	while (continueRun)
 	{
 		printf("osh>");
 		fflush(stdout);
 
-		getline(&line, &line_size, stdin);
+		getline(&line, &line_size, stdin); //get command line string
 
 		int line_len = strlen(line);
-		if (line_len == 1)
+		if (line_len != 1)
 		{
-			continue;
-		}
-		line[line_len - 1] = '\0';
+			line[line_len - 1] = '\0'; //add end signal to string
 
-		if (strcmp(line, "exit") == 0)
-		{
-			continueRun = 0;
-			continue;
-		}
-			else 
-			line[line_len - 1] = '\0';
-
-			if (strcmp(line, "exit") == 0) //user input exit
+			if (strcmp(line, "exit") == 0) //user input exit => exit
 			{
 				continueRun = 0;
 			}
