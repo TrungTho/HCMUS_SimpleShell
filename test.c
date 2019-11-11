@@ -109,13 +109,13 @@ void execLine(const char* line)
 	free(inputLine); //free memory
 }
 
-void saveCmd(const char* cmd)
+void saveCmd(const char* line)
 {
 	free(historyCache); //free memory to reset data
-	historyCache = strdup(cmd);	//new data to save
+	historyCache = strdup(line);	//new data to save
 }
 
-void history(const char* cmd)
+void history()
 {
 	if (historyCache == NULL)
 	{
@@ -230,7 +230,6 @@ void execPipe(const char* line)
 			wait(NULL);
 		}
 	}
-
 }
 
 int checkPipeCmd(const char* line)
@@ -273,7 +272,7 @@ int main(int argc, char* argv[])
 			else
 				if (strcmp(line, "!!") == 0) //user want to know the latest command line
 				{
-					history(line);
+					history();
 				}
 				else
 					if (checkPipeCmd(line)) //user want to use pipe to command
